@@ -1,14 +1,23 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit;
 //evaluation template
+$current_user = wp_get_current_user();
+$qurrent_user_quiz = get_user_meta($current_user->ID, 'quizy_current_quiz', true);
 
-$user_questions_ids = $_POST['questions'];
+if( array_key_exists('questions', $qurrent_user_quiz) ){
+	$user_questions_ids = $qurrent_user_quiz['questions'];
+	$user_answers_keys = $qurrent_user_quiz['answer'];
+}else{
+	$user_questions_ids = $_POST['questions'];
+
+	if( array_key_exists('answer', $_POST) ){
+		$user_answers_keys = $_POST['answer'];
+	}else{
+		$user_answers_keys = array();
+	}
+}
+
 $user_good_answers = 0;
 
-if( array_key_exists('answer', $_POST) ){
-	$user_answers_keys = $_POST['answer'];
-}else{
-	$user_answers_keys = array();
-}
 
 $q_args = array(
 	'post_type' => Qzy_Question_CPT::get_post_type_name(),
@@ -90,7 +99,25 @@ $user_questions = get_posts( $q_args );
 // Good answers rate
 $user_good_rate = $user_good_answers/count($user_questions_ids);
 $score = $user_good_rate*100;
-$score = round( $score, 2 );
+
+if( $score < 100 ){
+	$score = number_format( $score, 2 );
+}
 
 ?>
 <div class="result">Result : <?php echo $score; ?>%</div>
+<?php
+
+$qurrent_user_evaluation = get_user_meta($current_user->ID, 'quizy_evaluation', true);
+
+if( $qurrent_user_evaluation ){
+	$qurrent_user_evaluation[$quiz_id] = $score;
+}else{
+	$qurrent_user_evaluation = array( $quiz_id => $score );
+}
+
+if(!update_user_meta($current_user->ID, 'quizy_evaluation', $qurrent_user_evaluation)){
+	add_user_meta($current_user->ID, 'quizy_evaluation', $qurrent_user_evaluation);
+}
+
+delete_user_meta($current_user->ID, 'quizy_current_quiz');
