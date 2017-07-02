@@ -1,78 +1,75 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit;
-// get $quiz_id from shortcode attribs
-$quiz_post = get_post($quiz_id);
+<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
 
-// Quit if not a quiz
-if( !$quiz_post || $quiz_post->post_type != Qzy_Quiz_CPT::get_post_type_name() ){
-	?>
-	<p>No such Quiz! <?php echo $quiz_post->post_type; ?></p>
+<div class="quiz_wrap quiz_<?php echo $quiz_post->ID; ?>">
 	<?php
-	return;
-}
+	if( 
+		!$quiz_list_mode && ( count($questions) == 0 || ( array_key_exists('old_questions', $_POST) && count(json_decode( stripslashes($_POST['old_questions']) ) )+1 >= intval($max_questions_per_quiz) ) )
+		||
+		$quiz_list_mode && array_key_exists('questions', $_POST) && count($_POST['questions']) > 0 ):
 
-$cats = get_the_terms($quiz_id,'quiz_cat');
-$cats_array = array();
+		quizy_get_template( 'quiz-evaluation.php', array('quiz_list_mode' => $quiz_list_mode));
 
-if($cats){
-	foreach ($cats as $key => $cat) {
-		array_push($cats_array, $cat->name);
-	}
-}
+	else:
+		?>
+			<div class="questions-wrap">
+				<form action="" method="post">
+					<?php 
+					/**
+					 *	quizy_before_questions hook
+					 *
+					 *	@hooked : quizy_quiz_description_template - 10
+					 */
 
-$quiz_meta = get_post_meta( $quiz_id );
+					do_action('quizy_before_questions', $quiz_post, $questions, $quiz_list_mode);
 
-$quiz_type = ($quiz_meta['type'][0] ? $quiz_meta['type'][0] : get_option('qzy_default_quiz_type'));
-$quiz_duration_per_question = ($quiz_meta['duration'][0] ? $quiz_meta['duration'][0] : get_option('qzy_default_duration'));
-$max_questions_per_quiz = ($quiz_meta['questions_nbr'][0] ? $quiz_meta['questions_nbr'][0] : get_option('qzy_default_questions'));
-?>
-<div class="quiz_wrap">
-	<div class="quiz_info">
-		<h2>Quiz information</h2>
-		<ul>
-			<li><strong>Title :</strong> <?php echo $quiz_post->post_title; ?></li>
-			<li><strong>Description :</strong> <?php echo $quiz_post->post_content; ?></li>
-			<li><strong>Categories :</strong> <?php echo implode(',', $cats_array); ?></li>
-			<li><strong>Type :</strong> <?php echo $quiz_type; ?></li>
-			<li><strong>Duration/Question :</strong> <?php echo $quiz_duration_per_question; ?></li>
-			<li><strong>Max questions/Quiz :</strong> <?php echo $max_questions_per_quiz; ?></li>
-		</ul>
-	</div>
-	<?php
-	$args = array(
-			'post_type' => Qzy_Question_CPT::get_post_type_name(),
-			'posts_per_page' => -1,
-			'meta_key' => 'quiz_related',
-	 		'orderby' => 'rand',
-			'meta_query' => array(
-				'key' => 'quiz_related',
-				'value' => $quiz_id,
-				'compare' => '='
-				)
-		);
-	$questions = get_posts($args);
+					$question_num = 1;
 
-	$quiz_evaluating = false;
-	
-	if( array_key_exists('questions', $_POST) && count($_POST['questions']) > 0 ){
-		$quiz_evaluating = true;
-	}
+					foreach ($questions as $question):
 
-	$nbr_question = 0;
+						/**
+						 *	quizy_before_question hook
+						 */
+						do_action('quizy_before_question', $question);
 
-	if( $quiz_evaluating ){
-		require QUIZY_TEMPLATES_DIR.'/quiz-evaluation.php';
-	}else{
+						$passing_args = array(
+							'question' => $question,
+							'quiz_type' => $quiz_type,
+							'question_num' => $question_num++
+						);
+
+						if( !$quiz_list_mode ){
+							if( array_key_exists('old_questions', $_POST) ){
+								$passing_args['question_num'] = 2 + count( json_decode( stripslashes($_POST['old_questions']), true) );
+							}else{
+								$passing_args['question_num'] = 1;
+							}
+						}
+
+						quizy_get_template( 'question-content.php', $passing_args);
+
+						/**
+						 *	quizy_after_question hook
+						 */
+						do_action('quizy_after_question', $question);
+
+					endforeach;
+
+					// Add hidden imputs in which we save data for previous questions
+					quizy_add_hidden( $quiz_list_mode );
+
+					/**
+					 *	quizy_after_questions hook
+					 *
+					 *	@hooked : quizy_show_questions_number - 9
+					 *	@hooked : quizy_quiz_submit_button_template - 10
+					 */
+
+					do_action('quizy_after_questions', $quiz_post, $questions, $quiz_list_mode);
+
+					?>
+				</form>
+			</div>	
+		<?php
+	endif;
 	?>
-		<div class="questions-wrap">
-			<form action="" method="post">
-				<?php foreach ($questions as $key => $question):?>
-					<?php require QUIZY_TEMPLATES_DIR.'/question-content.php'; ?>
-				<?php endforeach; ?>
-				<input type="submit" value="Send">
-			</form>
-		</div>	
-	<?php
-	}
-	?>
-
 </div>

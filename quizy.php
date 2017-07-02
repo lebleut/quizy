@@ -3,7 +3,7 @@
 Plugin Name: Quizy
 Plugin URI: https://www.tooltipy.com
 Description: Quizy enable you to create awesome Quizzes and tests..
-Version: 1.0
+Version: 1.1
 Author: Jamel Zarga
 Author URI: https://github.com/lebleut/
 License: GPL
@@ -64,7 +64,8 @@ class Quizy {
 
     function requirements(){
     	// Required files should be loaded here
-    	require_once QUIZY_BASE_DIR.'/includes/quiz-cpt-class.php';
+        require_once QUIZY_BASE_DIR.'/includes/quizy-core-functions.php';
+        require_once QUIZY_BASE_DIR.'/includes/quiz-cpt-class.php';
     	require_once QUIZY_BASE_DIR.'/includes/question-cpt-class.php';
     }
 
@@ -80,6 +81,8 @@ class Quizy {
         add_action( 'admin_menu', array($this, 'add_admin_menu') );
 
         add_action('admin_init', array($this, 'settings_init') );
+
+        $this->default_hooks();
 
     }
 
@@ -130,18 +133,21 @@ class Quizy {
         
         if( 'edit-'.$question_post_type_name == $current_screen->id ){
             // When in list questions
-            wp_enqueue_script( 'qzy_quickedit_admin_script', QUIZY_PLUGIN_URL . 'admin/list-questions.js', array('jquery') );
+            wp_enqueue_script( 'qzy_quickedit_admin_script', QUIZY_PLUGIN_URL . 'admin/assets/list-questions.js', array('jquery') );
         }else if( $question_post_type_name == $current_screen->id ){
             // When in single question edit page
-            wp_enqueue_script( 'qzy_admin_script', QUIZY_PLUGIN_URL . 'admin/admin.js', array('jquery') );
-            wp_enqueue_style( 'qzy_admin_style', QUIZY_PLUGIN_URL . 'admin/style.css' );
+            wp_enqueue_script( 'qzy_admin_script', QUIZY_PLUGIN_URL . 'admin/assets/admin.js', array('jquery') );
+            wp_enqueue_style( 'qzy_admin_style', QUIZY_PLUGIN_URL . 'admin/assets/style.css' );
         }
     }
 
     function frontend_scripts(){
         // Front end style filter hook
-        $frontend_style_file = apply_filters('qzy_stylesheet_url ', QUIZY_PLUGIN_URL . 'assets/style.css');
+        $frontend_style_file = apply_filters('quizy_stylesheet_url ', QUIZY_PLUGIN_URL . 'assets/style.css');
+        $frontend_script_file = apply_filters('quizy_script_url ', QUIZY_PLUGIN_URL . 'assets/quizy.js');
+
         wp_enqueue_style( 'qzy_style', $frontend_style_file );
+        wp_enqueue_script( 'qzy_admin_script', $frontend_script_file, array('jquery') );
     }
 
     function settings_init()
@@ -242,6 +248,9 @@ class Quizy {
         <?php
     }
 
+    function default_hooks(){
+        require_once QUIZY_BASE_DIR.'/includes/quizy-default-hooks.php';
+    }
 }
 
 // Starting the Quizy plugin

@@ -6,6 +6,14 @@ $qurrent_user_quiz = get_user_meta($current_user->ID, 'quizy_current_quiz', true
 if( array_key_exists('questions', $qurrent_user_quiz) ){
 	$user_questions_ids = $qurrent_user_quiz['questions'];
 	$user_answers_keys = $qurrent_user_quiz['answer'];
+	$user_questions_ids = json_decode( stripslashes($_POST['old_questions']), true);
+	$user_answers_keys = json_decode( stripslashes($_POST['old_answers']), true);
+
+	$user_questions_ids = array_merge( $user_questions_ids, $_POST['questions'] );
+
+	if( array_key_exists('answer', $_POST) ){
+		$user_answers_keys = $user_answers_keys + $_POST['answer'];
+	}
 }else{
 	$user_questions_ids = $_POST['questions'];
 
@@ -15,6 +23,7 @@ if( array_key_exists('questions', $qurrent_user_quiz) ){
 		$user_answers_keys = array();
 	}
 }
+$user_good_answers = 0;
 
 $user_good_answers = 0;
 
@@ -23,7 +32,8 @@ $q_args = array(
 	'post_type' => Qzy_Question_CPT::get_post_type_name(),
 	'posts_per_page' => -1,
 	'meta_key' => 'quiz_related',
-	'post__in' => $user_questions_ids
+	'post__in' => $user_questions_ids,
+	'orderby' => 'post__in'
 	);
 
 $user_questions = get_posts( $q_args );
@@ -31,10 +41,10 @@ $user_questions = get_posts( $q_args );
 ?>
 <div class="questions-eval-wrap">
 	<?php
-	foreach ($user_questions as $question) {
+	foreach ($user_questions as $question_key=>$question) {
 		?>
 		<div class="question">
-			<h2><?php echo esc_html($question->post_content); ?> :</h2>
+			<h2><?php echo $question_key+1; ?>. <?php echo esc_html($question->post_content); ?></h2>
 			<?php
 
 			$answers = get_post_meta($question->ID,'answers', true);

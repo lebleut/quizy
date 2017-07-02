@@ -241,16 +241,85 @@ class Qzy_Quiz_CPT {
 
     function shortcode( $atts ) {
         $atts = shortcode_atts( array(
-            'id' => ''
+            'id' => '',
+            'list' => 'no'
         ), $atts, 'quizy' );
 
         $quiz_id = $atts['id'];
 
-        $quiz_tpl_file = apply_filters('qzy_quiz_template', QUIZY_TEMPLATES_DIR.'/single-quiz-tpl.php');
+        $quiz_list_mode = false;
 
-        ob_start();
-        require $quiz_tpl_file;
-        return ob_get_clean();  
+        if( $atts['list'] == 'yes' ){
+            $quiz_list_mode = true;
+        }
+
+        $quiz_post = get_post($quiz_id);
+
+        // Quit if not a quiz
+        if( !$quiz_post || $quiz_post->post_type != Qzy_Quiz_CPT::get_post_type_name() ){
+            ?>
+            <p>No such Quiz! <?php echo $quiz_post->post_type; ?></p>
+            <?php
+            return;
+        }
+
+        $args = array(
+            'post_type' => Qzy_Question_CPT::get_post_type_name(),
+            'posts_per_page' => -1,
+            'meta_key' => 'quiz_related',
+            'orderby' => 'rand',
+            'meta_query' => array(
+                'key' => 'quiz_related',
+                'value' => $quiz_id,
+                'compare' => '='
+                )
+        );
+
+        if( !$quiz_list_mode && array_key_exists('old_questions', $_POST) ){
+            $args['post__not_in'] = json_decode( stripslashes($_POST['old_questions']), true);
+
+            if( !is_array($args['post__not_in']) ){
+                $args['post__not_in'] = array();
+            }
+
+            $args['post__not_in'] = array_merge ($args['post__not_in'], $_POST['questions']);
+        }
+
+        $questions = get_posts($args);
+
+        $nbr_questions = 1;
+
+        $quiz_type = '';
+        $max_questions_per_quiz = 1;
+        // Remove questions without good answers
+        //  if unique choise questions type and good answers are more then one 
+        //  or if over max questions
+        foreach ($questions as $key => $question) {
+            $goods = get_post_meta($question->ID,'goods', true);
+            $quiz_type = Qzy_Quiz_CPT::get_quiz_information( $quiz_post->ID, 'type' );
+            $max_questions_per_quiz = Qzy_Quiz_CPT::get_quiz_information( $quiz_post->ID, 'questions_number' );
+            if( count($goods) == 0 || ( count($goods) > 1 && 'ucq' == $quiz_type ) || $nbr_questions > $max_questions_per_quiz ){
+                unset( $questions[$key] );
+            }else{
+                $nbr_questions++;
+            }
+
+        }
+
+        if( !$quiz_list_mode && count($questions) > 0 ){
+            reset($questions);
+            $questions = array( current($questions) );
+        }
+
+        $passing_args = array(
+            'quiz_post' => $quiz_post,
+            'questions' => $questions,
+            'quiz_type' => $quiz_type,
+            'max_questions_per_quiz' => $max_questions_per_quiz,
+            'quiz_list_mode' => $quiz_list_mode
+        );
+
+        quizy_get_template( 'single-quiz-tpl.php', $passing_args);
     }
 
     function custom_columns_head($old_column_names) {
@@ -283,6 +352,45 @@ class Qzy_Quiz_CPT {
                 # code...
                 break;
         }
+    }
+
+    public static function get_quiz_cats( $quiz_id ){
+
+        $cats = get_the_terms($quiz_id,'quiz_cat');
+        $cats_array = array();
+
+        if($cats){
+            foreach ($cats as $key => $cat) {
+                array_push($cats_array, $cat->name);
+            }
+        }
+
+        return $cats_array;
+
+    }
+
+    public static function get_quiz_information( $quiz_id, $information ){
+        
+        $quiz_meta = get_post_meta( $quiz_id );
+
+        switch ($information) {
+            case 'type':
+                return ($quiz_meta['type'][0] ? $quiz_meta['type'][0] : get_option('qzy_default_quiz_type'));
+                break;
+
+            case 'question_duration':
+                return ($quiz_meta['duration'][0] ? $quiz_meta['duration'][0] : get_option('qzy_default_duration'));
+                break;
+
+            case 'questions_number':
+                return ($quiz_meta['questions_nbr'][0] ? $quiz_meta['questions_nbr'][0] : get_option('qzy_default_questions'));
+                break;
+            
+            default:
+                return false;
+                break;
+        }
+        
     }
 
 }
